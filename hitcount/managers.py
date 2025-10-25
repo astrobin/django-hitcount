@@ -11,9 +11,17 @@ from django.contrib.contenttypes.models import ContentType
 class HitCountManager(models.Manager):
 
     def get_for_object(self, obj):
+        from django.core.exceptions import MultipleObjectsReturned
+
         ctype = ContentType.objects.get_for_model(obj)
-        hit_count, created = self.get_or_create(
-            content_type=ctype, object_pk=obj.pk)
+        try:
+            hit_count, created = self.get_or_create(
+                content_type=ctype, object_pk=obj.pk)
+        except MultipleObjectsReturned:
+            # Handle duplicate HitCount records gracefully by returning the first one.
+            # Note: Duplicates should be cleaned up by a separate cleanup task as they
+            # violate the unique_together constraint.
+            hit_count = self.filter(content_type=ctype, object_pk=obj.pk).first()
         return hit_count
 
 
