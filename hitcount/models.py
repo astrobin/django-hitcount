@@ -4,6 +4,7 @@ from datetime import timedelta
 
 from django.db import models
 from django.conf import settings
+from django.core.exceptions import MultipleObjectsReturned
 from django.db.models import F
 from django.utils import timezone
 from django.dispatch import receiver
@@ -187,6 +188,14 @@ class HitCountMixin(object):
     @property
     def hit_count(self):
         ctype = ContentType.objects.get_for_model(self.__class__)
-        hit_count, created = HitCount.objects.get_or_create(
-            content_type=ctype, object_pk=self.pk)
+        try:
+            hit_count, created = HitCount.objects.get_or_create(
+                content_type=ctype, object_pk=self.pk)
+        except MultipleObjectsReturned:
+            # Handle duplicate HitCount records gracefully by returning the first one.
+            # This can happen due to race conditions or data migration issues.
+            # Note: Duplicates should be cleaned up by a separate cleanup task as they
+            # violate the unique_together constraint.
+            hit_count = HitCount.objects.filter(
+                content_type=ctype, object_pk=self.pk).first()
         return hit_count

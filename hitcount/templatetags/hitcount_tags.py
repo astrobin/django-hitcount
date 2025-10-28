@@ -4,6 +4,7 @@ from collections import namedtuple
 
 from django import template
 from django.contrib.contenttypes.models import ContentType
+from django.core.exceptions import MultipleObjectsReturned
 try:
     from django.core.urlresolvers import reverse
 except ImportError:
@@ -36,8 +37,16 @@ def get_hit_count_from_obj_variable(context, obj_variable, tag_name):
     except AttributeError:
         raise error_to_raise
 
-    hit_count, created = HitCount.objects.get_or_create(
-        content_type=ctype, object_pk=obj.pk)
+    try:
+        hit_count, created = HitCount.objects.get_or_create(
+            content_type=ctype, object_pk=obj.pk)
+    except MultipleObjectsReturned:
+        # Handle duplicate HitCount records gracefully by returning the first one.
+        # This can happen due to race conditions or data migration issues.
+        # Note: Duplicates should be cleaned up by a separate cleanup task as they
+        # violate the unique_together constraint.
+        hit_count = HitCount.objects.filter(
+            content_type=ctype, object_pk=obj.pk).first()
 
     return hit_count
 
