@@ -41,12 +41,7 @@ def get_hit_count_from_obj_variable(context, obj_variable, tag_name):
         hit_count, created = HitCount.objects.get_or_create(
             content_type=ctype, object_pk=obj.pk)
     except MultipleObjectsReturned:
-        # Handle duplicate HitCount records gracefully by returning the first one.
-        # This can happen due to race conditions or data migration issues.
-        # Note: Duplicates should be cleaned up by a separate cleanup task as they
-        # violate the unique_together constraint.
-        hit_count = HitCount.objects.filter(
-            content_type=ctype, object_pk=obj.pk).first()
+        hit_count = HitCount.objects._merge_duplicates(ctype, obj.pk)
 
     return hit_count
 
